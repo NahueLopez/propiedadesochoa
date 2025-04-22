@@ -1,43 +1,58 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import ConfirmModal from '../components/Inmueble/ConfirmModal';
+import ClienteModal from '../components/Clientes/ClienteModal';
+import { getCustomers, getCustomer, addCustomer, updateCustomer, deleteCustomer } from '../services/CustomerService';
 
 function Clientes() {
-  const [clientes, setClientes] = useState([
-    {
-      id: 1,
-      nombre: 'Juan Pérez',
-      email: 'juan.perez@email.com',
-      telefono: '123-456-7890',
-      tipo: 'Propietario',
-    },
-    {
-      id: 2,
-      nombre: 'María Gómez',
-      email: 'maria.gomez@email.com',
-      telefono: '987-654-3210',
-      tipo: 'Inquilino',
-    },
-  ]);
+  const [clientes, setClientes] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [confirmModalOpen, setConfirmModalOpen] = useState(false);
   const [selectedCliente, setSelectedCliente] = useState(null);
   const [clienteToDelete, setClienteToDelete] = useState(null);
-  const [search, setSearch] = useState(''); // Estado para el buscador
+  const [search, setSearch] = useState('');
+  const [error, setError] = useState(''); // Error genérico para la interfaz
 
-  const filteredClientes = clientes.filter((cliente) =>
-    cliente.nombre.toLowerCase().includes(search.toLowerCase()) ||
-    cliente.email.toLowerCase().includes(search.toLowerCase()) ||
-    cliente.telefono.toLowerCase().includes(search.toLowerCase()) ||
-    cliente.tipo.toLowerCase().includes(search.toLowerCase())
-  );
+  useEffect(() => {
+    const fetchCustomers = async () => {
+      try {
+        setLoading(true);
+        const data = await getCustomers();
+        setClientes(data);
+      } catch (error) {
+        setError('Error al cargar los clientes. Intenta de nuevo.');
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchCustomers();
+  }, []);
+
+  // Solo cargar datos del cliente si tiene un ID válido (no null)
+  useEffect(() => {
+    if (selectedCliente && selectedCliente.id) {
+      const fetchCustomerData = async () => {
+        try {
+          setLoading(true);
+          const data = await getCustomer(selectedCliente.id);
+          setSelectedCliente(data);
+        } catch (error) {
+          setError('Error al cargar los datos del cliente.');
+        } finally {
+          setLoading(false);
+        }
+      };
+      fetchCustomerData();
+    }
+  }, [selectedCliente]);
 
   const handleAddCliente = () => {
-    setSelectedCliente(null);
+    setSelectedCliente({ id: null, name: '', lastname: '', phone: '', type: 'dueño' });
     setModalOpen(true);
   };
 
   const handleEdit = (cliente) => {
-    setSelectedCliente(cliente);
+    setSelectedCliente({ ...cliente });
     setModalOpen(true);
   };
 
@@ -46,23 +61,64 @@ function Clientes() {
     setConfirmModalOpen(true);
   };
 
-  const confirmDelete = () => {
-    setClientes(clientes.filter((cliente) => cliente.id !== clienteToDelete));
-    setConfirmModalOpen(false);
-    setClienteToDelete(null);
+  const confirmDelete = async () => {
+    try {
+      setLoading(true);
+      await deleteCustomer(clienteToDelete);
+      setClientes(clientes.filter((cliente) => cliente.id !== clienteToDelete));
+      setConfirmModalOpen(false);
+      setClienteToDelete(null);
+    } catch (error) {
+      setError('Error al eliminar el cliente. Intenta de nuevo.');
+      console.error('Error en confirmDelete:', error.response?.data || error.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleSave = (data) => {
-    if (selectedCliente) {
-      setClientes(
-        clientes.map((cliente) =>
-          cliente.id === selectedCliente.id ? { ...cliente, ...data } : cliente
-        )
-      );
-    } else {
-      setClientes([...clientes, { ...data, id: Date.now() }]);
+  const handleSave = async (data) => {
+    try {
+      setLoading(true);
+      if (selectedCliente && selectedCliente.id) {
+        const updatedCliente = await updateCustomer(selectedCliente.id, data);
+        setClientes(
+          clientes.map((cliente) =>
+            cliente.id === selectedCliente.id ? updatedCliente : cliente
+          )
+        );
+      } else {
+        const response = await addCustomer(data);
+
+        let newCliente;
+        if (response.customer) {
+          newCliente = response.customer; // Si el backend envuelve el cliente en { customer: ... }
+        } else {
+          newCliente = response; // Si devuelve el cliente directamente
+        }
+
+        // Actualizamos el estado dentro del callback
+        setClientes((prevClientes) => {
+          const updatedClientes = [...prevClientes, newCliente];
+          return updatedClientes;
+        });
+
+        // Verificación dentro del mismo scope (opcional, pero mantenemos como fallback)
+        setClientes((prevClientes) => {
+          if (!prevClientes.some((c) => c.id === newCliente.id)) {
+            return [...prevClientes, newCliente]; // Intentamos forzar la adición
+          }
+          return prevClientes;
+        });
+      }
+      setModalOpen(false);
+      setError('');
+    } catch (error) {
+      const serverError = error.response?.data?.message || error.response?.data?.error || error.message || 'Error desconocido al guardar el cliente.';
+      setError(serverError); // Pasamos el error específico al estado
+      console.error('Error en handleSave:', error.response?.data || error.message);
+    } finally {
+      setLoading(false);
     }
-    setModalOpen(false);
   };
 
   return (
@@ -76,8 +132,8 @@ function Clientes() {
           Agregar Cliente
         </button>
       </div>
-
-      {/* Buscador */}
+      {error && <p className="text-red-500 mb-4">{error}</p>} {/* Mostramos el error genérico aquí */}
+      {loading && <p className="text-gray-500 mb-4 text-center">Cargando...</p>}
       <div className="mb-6">
         <input
           type="text"
@@ -85,44 +141,45 @@ function Clientes() {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className="w-full p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+          disabled={true}
         />
       </div>
-
-      {/* Tabla de clientes */}
-      {filteredClientes.length > 0 ? (
+      {loading ? null : clientes.length > 0 ? (
         <div className="overflow-x-auto bg-white rounded-lg shadow-md">
           <table className="w-full table-auto">
             <thead className="bg-gray-100 text-gray-600 uppercase text-xs font-semibold">
               <tr>
+                <th className="py-4 px-6 text-left">ID</th>
                 <th className="py-4 px-6 text-left">Nombre</th>
-                <th className="py-4 px-6 text-left">Email</th>
+                <th className="py-4 px-6 text-left">Apellido</th>
                 <th className="py-4 px-6 text-left">Teléfono</th>
                 <th className="py-4 px-6 text-left">Tipo</th>
                 <th className="py-4 px-6 text-right">Acciones</th>
               </tr>
             </thead>
             <tbody className="text-gray-700">
-              {filteredClientes.map((cliente, index) => (
+              {clientes.map((cliente, index) => (
                 <tr
                   key={cliente.id}
-                  className={`border-b ${
-                    index % 2 === 0 ? 'bg-gray-50' : 'bg-white'
-                  } hover:bg-gray-100 transition-colors duration-150`}
+                  className={`border-b ${index % 2 === 0 ? 'bg-gray-50' : 'bg-white'} hover:bg-gray-100 transition-colors duration-150`}
                 >
-                  <td className="py-4 px-6 font-medium">{cliente.nombre}</td>
-                  <td className="py-4 px-6">{cliente.email}</td>
-                  <td className="py-4 px-6">{cliente.telefono}</td>
-                  <td className="py-4 px-6">{cliente.tipo}</td>
+                  <td className="py-4 px-6 font-medium">{cliente.id}</td>
+                  <td className="py-4 px-6">{cliente.name || 'Sin nombre'}</td>
+                  <td className="py-4 px-6">{cliente.lastname || 'Sin apellido'}</td>
+                  <td className="py-4 px-6">{cliente.phone || 'Sin teléfono'}</td>
+                  <td className="py-4 px-6">{cliente.type || 'Sin tipo'}</td>
                   <td className="py-4 px-6 text-right">
                     <button
                       onClick={() => handleEdit(cliente)}
                       className="text-blue-600 hover:text-blue-800 font-medium mr-4 transition-colors duration-150"
+                      disabled={loading}
                     >
                       Editar
                     </button>
                     <button
                       onClick={() => handleDelete(cliente.id)}
                       className="text-red-600 hover:text-red-800 font-medium transition-colors duration-150"
+                      disabled={loading}
                     >
                       Eliminar
                     </button>
@@ -135,120 +192,21 @@ function Clientes() {
       ) : (
         <p className="text-gray-500 text-center py-6">No hay clientes registrados.</p>
       )}
-
       {modalOpen && (
         <ClienteModal
           cliente={selectedCliente}
           onSave={handleSave}
           onClose={() => setModalOpen(false)}
+          loading={loading}
+          serverError={error} // Pasamos el error del backend al modal
         />
       )}
-
       <ConfirmModal
         isOpen={confirmModalOpen}
         onClose={() => setConfirmModalOpen(false)}
         onConfirm={confirmDelete}
         message="¿Estás seguro de eliminar este cliente?"
       />
-    </div>
-  );
-}
-
-// Modal para agregar/editar clientes
-function ClienteModal({ cliente, onSave, onClose }) {
-  const [formData, setFormData] = useState({
-    nombre: '',
-    email: '',
-    telefono: '',
-    tipo: 'Propietario', // Valor por defecto
-  });
-
-  React.useEffect(() => {
-    if (cliente) {
-      setFormData(cliente);
-    }
-  }, [cliente]);
-
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setFormData({ ...formData, [name]: value });
-  };
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    onSave(formData);
-  };
-
-  return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
-      <div className="bg-white p-6 rounded-lg shadow-lg w-full max-w-md">
-        <h3 className="text-lg font-semibold mb-4">
-          {cliente ? 'Editar Cliente' : 'Agregar Cliente'}
-        </h3>
-        <form onSubmit={handleSubmit}>
-          <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-700">Nombre</label>
-            <input
-              type="text"
-              name="nombre"
-              value={formData.nombre}
-              onChange={handleChange}
-              className="w-full p-2 border rounded-lg"
-              required
-            />
-          </div>
-          <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-700">Email</label>
-            <input
-              type="email"
-              name="email"
-              value={formData.email}
-              onChange={handleChange}
-              className="w-full p-2 border rounded-lg"
-              required
-            />
-          </div>
-          <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-700">Teléfono</label>
-            <input
-              type="text"
-              name="telefono"
-              value={formData.telefono}
-              onChange={handleChange}
-              className="w-full p-2 border rounded-lg"
-              required
-            />
-          </div>
-          <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-700">Tipo</label>
-            <select
-              name="tipo"
-              value={formData.tipo}
-              onChange={handleChange}
-              className="w-full p-2 border rounded-lg"
-            >
-              <option value="Propietario">Propietario</option>
-              <option value="Inquilino">Inquilino</option>
-              <option value="Comprador">Comprador</option>
-            </select>
-          </div>
-          <div className="flex justify-end space-x-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700"
-            >
-              Cancelar
-            </button>
-            <button
-              type="submit"
-              className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
-            >
-              Guardar
-            </button>
-          </div>
-        </form>
-      </div>
     </div>
   );
 }

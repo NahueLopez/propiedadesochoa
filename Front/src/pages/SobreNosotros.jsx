@@ -49,7 +49,7 @@ function SobreNosotros() {
   };
 
   return (
-    <div className="flex flex-col w-full py-12 bg-gradient-to-br from-gray-900 via-black to-gray-800 items-center justify-center">
+    <div className="flex flex-col w-full py-12 bg-gradient-to-br min-h-screen from-gray-900 via-black to-gray-800 items-center justify-center">
       {/* Contenedor principal */}
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 space-y-12 mt-14">
         {/* Primer div: entra desde la izquierda */}
@@ -87,7 +87,7 @@ function SobreNosotros() {
             <li className="flex items-start">
               <span className="text-amber-500 mr-2 animate-pulse">►</span>
               <p className="text-lg text-gray-200">
-                Administramos su alquiler 36 meses a un costo mínimo, con garantía de cobro del 1 al 10 de cada mes.
+              Administramos alquileres de viviendas de 12 a 24 meses con actualizaciones trimestrales, cuatrimestrales y semestrales o comerciales 36 meses a un costo mínimo, con garantía de cobro del 1 al 10 de cada mes.
               </p>
             </li>
           </ul>

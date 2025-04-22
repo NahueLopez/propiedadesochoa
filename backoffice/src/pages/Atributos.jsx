@@ -1,30 +1,44 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import AtributoModal from '../components/Atributos/AtributoModal';
 import ConfirmModal from '../components/Atributos/ConfirmModal';
+import { getAtributos, addAtributo, updateAtributo, deleteAtributo } from '../services/AtributoService';
 
 function Atributos() {
-  const [atributos, setAtributos] = useState([
-    { id: 1, nombre: 'Piscina' },
-    { id: 2, nombre: 'Garage' },
-    { id: 3, nombre: 'Balcón' },
-  ]);
+  const [atributos, setAtributos] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [confirmModalOpen, setConfirmModalOpen] = useState(false);
   const [selectedAtributo, setSelectedAtributo] = useState(null);
   const [atributoToDelete, setAtributoToDelete] = useState(null);
-  const [search, setSearch] = useState(''); // Estado para el buscador
+  const [search, setSearch] = useState('');
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    const fetchAtributos = async () => {
+      try {
+        setLoading(true);
+        const data = await getAtributos();
+        setAtributos(data);
+      } catch (error) {
+        setError('Error al cargar los atributos. Intenta de nuevo.');
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchAtributos();
+  }, []);
 
   const filteredAtributos = atributos.filter((atributo) =>
-    atributo.nombre.toLowerCase().includes(search.toLowerCase())
+    atributo.name.toLowerCase().includes(search.toLowerCase())
   );
 
   const handleAddAtributo = () => {
-    setSelectedAtributo(null);
+    setSelectedAtributo({ id: null, name: '' });
     setModalOpen(true);
   };
 
   const handleEdit = (atributo) => {
-    setSelectedAtributo(atributo);
+    setSelectedAtributo({ ...atributo });
     setModalOpen(true);
   };
 
@@ -33,23 +47,49 @@ function Atributos() {
     setConfirmModalOpen(true);
   };
 
-  const confirmDelete = () => {
-    setAtributos(atributos.filter((atributo) => atributo.id !== atributoToDelete));
-    setConfirmModalOpen(false);
-    setAtributoToDelete(null);
+  const confirmDelete = async () => {
+    try {
+      setLoading(true);
+      await deleteAtributo(atributoToDelete);
+      setAtributos(atributos.filter((atributo) => atributo.id !== atributoToDelete));
+      setConfirmModalOpen(false);
+      setAtributoToDelete(null);
+    } catch (error) {
+      setError('Error al eliminar el atributo. Intenta de nuevo.');
+      console.error('Error en confirmDelete:', error.response?.data || error.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleSave = (data) => {
-    if (selectedAtributo) {
-      setAtributos(
-        atributos.map((atributo) =>
-          atributo.id === selectedAtributo.id ? { ...atributo, ...data } : atributo
-        )
-      );
-    } else {
-      setAtributos([...atributos, { ...data, id: Date.now() }]);
+  const handleSave = async (data) => {
+    try {
+      setLoading(true);
+      if (selectedAtributo && selectedAtributo.id) {
+        const updatedAtributo = await updateAtributo(selectedAtributo.id, data);
+        setAtributos(
+          atributos.map((atributo) =>
+            atributo.id === selectedAtributo.id ? updatedAtributo : atributo
+          )
+        );
+      } else {
+        const response = await addAtributo(data);
+
+        let newAtributo = response; // Asumimos que el backend devuelve el atributo directamente
+        setAtributos((prevAtributos) => {
+          const updatedAtributos = [...prevAtributos, newAtributo];
+          return updatedAtributos;
+        });
+      }
+      setModalOpen(false);
+      setError('');
+    } catch (error) {
+      const serverError = error.response?.data?.message || error.response?.data?.error || error.message || 'Error desconocido al guardar el atributo.';
+      setError(serverError);
+      console.error('Error en handleSave:', error.response?.data || error.message);
+    } finally {
+      setLoading(false);
     }
-    setModalOpen(false);
   };
 
   return (
@@ -64,7 +104,9 @@ function Atributos() {
         </button>
       </div>
 
-      {/* Buscador */}
+      {error && <p className="text-red-500 mb-4">{error}</p>}
+      {loading && <p className="text-gray-500 mb-4 text-center">Cargando...</p>}
+
       <div className="mb-6">
         <input
           type="text"
@@ -75,8 +117,7 @@ function Atributos() {
         />
       </div>
 
-      {/* Tabla mejorada */}
-      {filteredAtributos.length > 0 ? (
+      {loading ? null : filteredAtributos.length > 0 ? (
         <div className="overflow-x-auto bg-white rounded-lg shadow-md">
           <table className="w-full table-auto">
             <thead className="bg-gray-100 text-gray-600 uppercase text-xs font-semibold">
@@ -93,17 +134,19 @@ function Atributos() {
                     index % 2 === 0 ? 'bg-gray-50' : 'bg-white'
                   } hover:bg-gray-100 transition-colors duration-150`}
                 >
-                  <td className="py-4 px-6 font-medium">{atributo.nombre}</td>
+                  <td className="py-4 px-6 font-medium">{atributo.name}</td>
                   <td className="py-4 px-6 text-right">
                     <button
                       onClick={() => handleEdit(atributo)}
                       className="text-blue-600 hover:text-blue-800 font-medium mr-4 transition-colors duration-150"
+                      disabled={loading}
                     >
                       Editar
                     </button>
                     <button
                       onClick={() => handleDelete(atributo.id)}
                       className="text-red-600 hover:text-red-800 font-medium transition-colors duration-150"
+                      disabled={loading}
                     >
                       Eliminar
                     </button>
@@ -122,6 +165,8 @@ function Atributos() {
           atributo={selectedAtributo}
           onSave={handleSave}
           onClose={() => setModalOpen(false)}
+          loading={loading}
+          serverError={error}
         />
       )}
 

@@ -33,7 +33,7 @@ function Contacto() {
       {/* Formulario de contacto */}
       <div
         id="formulario"
-        className={`bg-gray-800 bg-opacity-95 shadow-xl rounded-2xl w-full max-w-md p-6 flex flex-col justify-between transform transition-all duration-1000 ease-in-out ${
+        className={`mt-16 lg:mt-0  bg-gray-800 bg-opacity-95 shadow-xl rounded-2xl w-full max-w-md p-6 flex flex-col justify-between transform transition-all duration-1000 ease-in-out ${
           formVisible ? "opacity-100 translate-y-0 scale-100" : "opacity-0 translate-y-10 scale-95"
         }`}
       >
@@ -80,7 +80,15 @@ function Contacto() {
           <div className="flex flex-col gap-3 items-center text-gray-300">
             <div className="flex items-center gap-2 hover:text-amber-500 transition">
               <FaWhatsapp className="text-green-400 text-lg" />
-              <span>+54 223 123 4567</span>
+              <a href="https://wa.me/+542231234567" target="_blank" rel="noopener noreferrer">
+                +54 223 123 4567
+              </a>
+            </div>
+            <div className="flex items-center gap-2 hover:text-amber-500 transition">
+              <FaWhatsapp className="text-green-400 text-lg" />
+              <a href="https://wa.me/+542234006565" target="_blank" rel="noopener noreferrer">
+                +54 223 400 6565
+              </a>
             </div>
             <div className="flex items-center gap-2 hover:text-amber-500 transition">
               <IoIosMail className="text-red-400 text-lg" />
@@ -88,7 +96,7 @@ function Contacto() {
             </div>
             <div className="flex items-center gap-2 hover:text-amber-500 transition">
               <FaMapMarkedAlt className="text-blue-400 text-lg" />
-              <p>Irala 6018</p>
+              <p>Rivadavia 3171</p>
             </div>
 
             {/* Mapa */}
